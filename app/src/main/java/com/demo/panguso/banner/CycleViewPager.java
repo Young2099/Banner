@@ -2,7 +2,6 @@ package com.demo.panguso.banner;
 
 import android.content.Context;
 import android.os.Handler;
-import android.os.Message;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -20,7 +19,7 @@ import java.util.List;
 
 public class CycleViewPager extends FrameLayout {
 
-    private static final int MOVE_PAGER = 1;
+    public static final int MOVE_PAGER = 1;
     private Context mContext;
     private LayoutInflater inflater;
     private ViewPager mViewPager;
@@ -36,22 +35,12 @@ public class CycleViewPager extends FrameLayout {
     //延播时间
     private long delayTime = 4000;
 
-    private Handler hanler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            if (msg.what == MOVE_PAGER) {
-                int currentItem = mViewPager.getCurrentItem() + 1;
-                mViewPager.setCurrentItem(currentItem, true);
-                hanler.postDelayed(runnable, delayTime);
-            }
-        }
-    };
+    private Handler handler;
 
     private Runnable runnable = new Runnable() {
         @Override
         public void run() {
-            hanler.sendEmptyMessage(MOVE_PAGER);
+            handler.sendEmptyMessage(MOVE_PAGER);
         }
     };
 
@@ -72,7 +61,8 @@ public class CycleViewPager extends FrameLayout {
         mIndicatorLayout = (LinearLayout) view.findViewById(R.id.ll_indicator);
     }
 
-    public void initData(List<View> view) {
+    public void initData(List<View> view, Handler mHandler) {
+        handler = mHandler;
         initViewPager(view);
     }
 
@@ -110,9 +100,10 @@ public class CycleViewPager extends FrameLayout {
         this.isWheel = wheelView;
         setIsCycle(true);
         if (isWheel) {
-            hanler.postDelayed(runnable, delayTime);
+            handler.removeCallbacks(runnable);
+            handler.postDelayed(runnable, delayTime);
         } else {
-            hanler.removeCallbacks(runnable);
+            handler.removeCallbacks(runnable);
         }
 
     }
@@ -128,6 +119,13 @@ public class CycleViewPager extends FrameLayout {
 
     private boolean isCycle() {
         return isCycle;
+    }
+
+    public void setCurrentItem() {
+        int currentItem = (mViewPager.getCurrentItem() + 1);
+        mViewPager.setCurrentItem(currentItem, true);
+        handler.postDelayed(runnable, delayTime);
+
     }
 
     private class ViewPagerListener implements ViewPager.OnPageChangeListener {
@@ -170,16 +168,16 @@ public class CycleViewPager extends FrameLayout {
                     y = motionEvent.getY();
                     break;
                 case MotionEvent.ACTION_MOVE:
-                    float dx = motionEvent.getX();
+                    float dx = motionEvent.getX() - x;
                     //根据手势滑动的距离做处理是否循环
                     if (dx != 0) {
-                        hanler.removeCallbacks(runnable);
+                        handler.removeCallbacks(runnable);
                     } else {
                         return true;
                     }
                     break;
                 case MotionEvent.ACTION_UP:
-                    hanler.postDelayed(runnable, delayTime);
+                    handler.postDelayed(runnable, delayTime);
                     break;
             }
             return false;
