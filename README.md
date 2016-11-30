@@ -44,29 +44,29 @@
         float y = 0;
         @Override
         public boolean onTouch(View view, MotionEvent motionEvent) {
-            switch (motionEvent.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    x = motionEvent.getX();
-                    y = motionEvent.getY();
-                    break;
-                case MotionEvent.ACTION_MOVE:
-                    float dx = motionEvent.getX();
-                    //根据手势滑动的距离做处理是否循环
-                    if (dx != 0) {
-                        hanler.removeCallbacks(runnable);
-                    } else {
-                        return true;
-                    }
-                    break;
-                case MotionEvent.ACTION_UP:
-                    hanler.postDelayed(runnable, delayTime);
-                    break;
+          switch (motionEvent.getAction()) {
+                     case MotionEvent.ACTION_DOWN:
+                         x = motionEvent.getX();
+                         y = motionEvent.getY();
+                         break;
+                     case MotionEvent.ACTION_MOVE:
+                         float dx = motionEvent.getX() - x;
+                         //根据手势滑动的距离做处理是否循环
+                         if (dx != 0) {
+                             handler.removeCallbacks(runnable);
+                         } else {
+                             return true;
+                         }
+                         break;
+                     case MotionEvent.ACTION_UP:
+                         handler.postDelayed(runnable, delayTime);
+                         break;
+                 }
+                 return false;
             }
-            return false;
-        }
     }
     
- 重点4：viewpager的adpater：一个是原视图的移除（不再显示的视图），另一个是新增显示视图（即将显示的视图）：
+重点4：viewpager的adpater：一个是原视图的移除（不再显示的视图），另一个是新增显示视图（即将显示的视图）：
  
      @Override
     public Object instantiateItem(ViewGroup container, int position) {
