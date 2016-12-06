@@ -102,7 +102,7 @@ public class CycleViewPager extends FrameLayout {
         if (isWheel) {
             handler.removeCallbacks(runnable);
             handler.postDelayed(runnable, delayTime);
-        } else {
+        } else if(runnable != null){
             handler.removeCallbacks(runnable);
         }
 
