@@ -4,7 +4,7 @@
     android:id="@+id/activity_main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.demo.panguso.banner.MainActivity">
+    tools:context="com.demo.panguso.banner.activity.MainActivity">
 
     <com.demo.panguso.banner.CycleViewPager
         android:id="@+id/cycle_viewpager"
