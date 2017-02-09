@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="LooperViewPager">
+
+        <attr name="LooperViewPager_hint_gravity">
+            <enum name="left" value="0" />
+            <enum name="center" value="1" />
+            <enum name="right" value="2" />
+        </attr>
+        <attr name="LooperViewPager_hint_paddingRight" format="dimension" />
+        <attr name="LooperViewPager_hint_paddingLeft" format="dimension" />
+        <attr name="LooperViewPager_hint_paddingTop" format="dimension" />
+        <attr name="LooperViewPager_hint_paddingBottom" format="dimension" />
+        <attr name="LooperViewPager_play_delay" format="integer" />
+        <attr name="LooperViewPager_hint_color" format="color" />
+        <attr name="LooperViewPager_hint_alpha" format="integer" />
+    </declare-styleable>
+    <item name="viewpager_inner" type="id" />
+</resources>

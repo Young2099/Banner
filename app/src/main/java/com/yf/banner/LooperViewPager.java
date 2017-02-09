@@ -1,6 +1,7 @@
 package com.yf.banner;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.database.DataSetObserver;
 import android.graphics.Color;
 import android.os.Handler;
@@ -10,12 +11,11 @@ import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
+import com.demo.panguso.banner.R;
+
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -24,17 +24,24 @@ import java.util.TimerTask;
  * 设置循环的ViewPager
  */
 
-public class LooperViewPager extends LinearLayout implements ViewPager.OnPageChangeListener {
+public class LooperViewPager extends RelativeLayout implements ViewPager.OnPageChangeListener {
     private ViewPager mViewPager;
-    private View mIndicatorView;
-    private ArrayList<View> views;
+    private ShapeView mIndicatorView;
     private PagerAdapter mAdapter;
     //播放延迟
     private int delay;
     //异步操作
     private Timer timer;
     //滑动触屏的时间
+
+    private int focusColor = Color.BLACK;
+    private int normalColor = Color.WHITE;
     private long mRecentTouchTime;
+
+    private int paddingLeft = 0;
+    private int paddingTop = 0;
+    private int paddingRight = 0;
+    private int paddingBottom = 0;
 
     public LooperViewPager(Context context) {
         this(context, null);
@@ -49,81 +56,183 @@ public class LooperViewPager extends LinearLayout implements ViewPager.OnPageCha
         initView(attrs);
     }
 
-    public void initData(ArrayList<View> view) {
-        views = view;
-        initIndicatorView();
-        setAdapter(new LooperAdapter(views, this));
-    }
-
-    //设置接口，将HintView的方法引用到这里，设置要显示指示器的position
-    public interface ViewDelegate {
-        void setCurrentPosition(int position, HintView hintView);
-    }
-
-    private ViewDelegate mViewDelegate = new ViewDelegate() {
-        @Override
-        public void setCurrentPosition(int position, HintView hintView) {
-            if (hintView != null) {
-                hintView.setCurrent(position);
-            }
-        }
-    };
-
-    /**
-     * 初始化ViewPager
-     */
+    //初始化viewpager
     private void initView(AttributeSet attrs) {
         if (mViewPager != null) {
             removeView(mViewPager);
         }
-        //设置viewPager的style,将它加入到LooperViewPager这个view里面去
-        mViewPager = new ViewPager(getContext(), attrs);
-        mViewPager.setLayoutParams(new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT));
+        //可以在布局文件设置style;
+        TypedArray typedArray = getContext().obtainStyledAttributes(attrs, R.styleable.LooperViewPager);
+        paddingBottom = (int) typedArray.getDimension(R.styleable.LooperViewPager_LooperViewPager_hint_paddingBottom, Util.dip2px(getContext(), 4));
+        mViewPager = new ViewPager(getContext());
+        mViewPager.setLayoutParams(new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT,
+                RelativeLayout.LayoutParams.MATCH_PARENT));
+        mViewPager.setId(R.id.viewpager_inner);
         addView(mViewPager);
-        mViewPager.setOnTouchListener(new ViewPagerTounch());
+        initIndicatorView();
     }
 
     /**
-     * 设置圆点View，在这里是根据传入的图片的view设置圆点的个数
+     * 初始化指示器的view
      */
     private void initIndicatorView() {
-        IndicatorView indicatorView = new IndicatorView(getContext());
-        indicatorView.setColorAndSize(views.size(), Color.parseColor("#E3AC42"), Color.parseColor("#88ffffff"));
         if (mIndicatorView != null) {
             removeView(mIndicatorView);
         }
-        if (mIndicatorView == null || !(mIndicatorView instanceof HintView)) {
-            return;
-        }
-        mIndicatorView = indicatorView;
-        loadIndicatorView();
+        mIndicatorView = new ShapeView(getContext());
+        mIndicatorView.setColor(focusColor, normalColor);
+        mIndicatorView.setPadding(paddingLeft, paddingRight, paddingTop, paddingBottom);
+        LayoutParams layoutParams = new LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        layoutParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        mIndicatorView.setLayoutParams(layoutParams);
+        addView(mIndicatorView);
+        mLooperViewDelegate.initView(mAdapter == null ? 0 : mAdapter.getCount(), mIndicatorView);
     }
 
-    /**
-     * 将indicator的view加入到viewpager
-     */
-    private void loadIndicatorView() {
-        addView(mIndicatorView);
-        mIndicatorView.setPadding(0, 0, 0, 10);
-        RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        //将圆点指示器设置到viewpager的底部
-        lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-        mIndicatorView.setLayoutParams(lp);
+    private LooperViewImpl mLooperViewDelegate = new LooperViewImpl() {
+        @Override
+        public void setCurrentPosition(int position, LooperView delegateView) {
+            if (delegateView != null) {
+                delegateView.setCurrent(position);
+            }
+        }
+
+        @Override
+        public void initView(int length, LooperView delegateView) {
+            if (delegateView != null) {
+                delegateView.initView(length);
+            }
+        }
+    };
+
+    private void startPlay() {
+        if (delay <= 0 || mAdapter == null || mAdapter.getCount() <= 1) {
+            return;
+        }
+        if (timer != null) {
+            timer.cancel();
+        }
+        timer = new Timer();
+        timer.schedule(new WeakTimerTask(this), delay, delay);
+
     }
 
     public void setAdapter(PagerAdapter adapter) {
+        adapter.registerDataSetObserver(new JPagerObserver());
         mViewPager.setAdapter(adapter);
         mViewPager.addOnPageChangeListener(this);
+        mViewPager.setOnTouchListener(new ViewPagerTouch());
         mAdapter = adapter;
         dataSetChanged();
-        adapter.registerDataSetObserver(new PagerObserver());
+    }
+
+    /**
+     * 用来实现adapter的notifyDataSetChanged通知HintView变化
+     */
+    private class JPagerObserver extends DataSetObserver {
+        @Override
+        public void onChanged() {
+            dataSetChanged();
+        }
+
+        @Override
+        public void onInvalidated() {
+            dataSetChanged();
+        }
     }
 
     private void dataSetChanged() {
+        if (mIndicatorView != null) {
+            mLooperViewDelegate.initView(mAdapter.getCount(), mIndicatorView);
+            mLooperViewDelegate.setCurrentPosition(mViewPager.getCurrentItem(), mIndicatorView);
+        }
+        //开始循环
         startPlay();
     }
 
-    private class ViewPagerTounch implements OnTouchListener {
+    @Override
+    public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+
+    }
+
+    @Override
+    public void onPageSelected(int position) {
+        mLooperViewDelegate.setCurrentPosition(position, mIndicatorView);
+    }
+
+    @Override
+    public void onPageScrollStateChanged(int state) {
+    }
+
+    public void setViewDelegate(LooperViewImpl looperViewDelegate) {
+        mLooperViewDelegate = looperViewDelegate;
+    }
+
+    public ViewPager getViewPager() {
+        return mViewPager;
+    }
+
+    /**
+     * 异步任务，循环播放
+     */
+    private static class WeakTimerTask extends TimerTask {
+        private WeakReference<LooperViewPager> mLooperViewPagerWeakReference;
+
+        public WeakTimerTask(LooperViewPager looperViewPager) {
+            this.mLooperViewPagerWeakReference = new WeakReference<>(looperViewPager);
+        }
+
+        @Override
+        public void run() {
+            LooperViewPager looperViewPager = mLooperViewPagerWeakReference.get();
+            if (looperViewPager != null) {
+                if (looperViewPager.isShown() && System.currentTimeMillis() - looperViewPager.mRecentTouchTime > looperViewPager.delay) {
+                    looperViewPager.mHandler.sendEmptyMessage(0);
+                }
+            } else {
+                cancel();
+            }
+        }
+    }
+
+    private TimerTaskHandler mHandler = new TimerTaskHandler(this);
+
+    /**
+     * 软引用的handler
+     */
+    private static class TimerTaskHandler extends Handler {
+        private WeakReference<LooperViewPager> mLooperViewPagerWeakReference;
+
+        public TimerTaskHandler(LooperViewPager looperViewPager) {
+            this.mLooperViewPagerWeakReference = new WeakReference<>(looperViewPager);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            LooperViewPager looperViewPager = mLooperViewPagerWeakReference.get();
+            int cur = looperViewPager.mViewPager.getCurrentItem() + 1;
+            if (cur >= looperViewPager.mAdapter.getCount()) {
+                cur = 0;
+            }
+            looperViewPager.mViewPager.setCurrentItem(cur);
+            looperViewPager.mLooperViewDelegate.setCurrentPosition(cur, looperViewPager.mIndicatorView);
+            if (looperViewPager.mViewPager.getCurrentItem() <= 1) {
+                looperViewPager.stopPlay();
+            }
+        }
+    }
+
+    /**
+     * 停止播放
+     */
+    private void stopPlay() {
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
+    }
+
+    private class ViewPagerTouch implements OnTouchListener {
         float x = 0;
         float y = 0;
 
@@ -153,117 +262,41 @@ public class LooperViewPager extends LinearLayout implements ViewPager.OnPageCha
         }
     }
 
-    private void stopPlay() {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-        }
-    }
-
     /**
-     * 开始轮播
+     * 实现触摸时和过后一定时间内不滑动，在动作分发的时候拦截
+     *
+     * @param ev
+     * @return
      */
-    private void startPlay() {
-        if (delay <= 0 || mAdapter == null || mAdapter.getCount() <= 1) {
-            return;
-        }
-        if (timer != null) {
-            timer.cancel();
-        }
-        timer = new Timer();
-        timer.schedule(new WeakTimerTask(this), delay, delay);
-    }
-
-    public ViewPager getViewPager() {
-        return mViewPager;
-    }
-
-    private static class TimerTaskHandler extends Handler {
-        private WeakReference<LooperViewPager> mLoopViewPagerWeakReference;
-
-        public TimerTaskHandler(LooperViewPager loopViewPager) {
-            this.mLoopViewPagerWeakReference = new WeakReference<>(loopViewPager);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            LooperViewPager loopViewPager = mLoopViewPagerWeakReference.get();
-            int current = loopViewPager.getViewPager().getCurrentItem() + 1;
-            if (current >= loopViewPager.mAdapter.getCount()) {
-                current = 0;
-            }
-            loopViewPager.getViewPager().setCurrentItem(current);
-            //这里也要圆点进行相应的滑动
-            loopViewPager.mViewDelegate.setCurrentPosition(current, (HintView) loopViewPager.mIndicatorView);
-        }
-    }
-
-    private TimerTaskHandler mHandler = new TimerTaskHandler(this);
-
-    /**
-     * 延迟多少执行scheduled,创建软引用的task
-     */
-    private static class WeakTimerTask extends TimerTask {
-        private WeakReference<LooperViewPager> mLoopViewPagerWeakReference;
-
-        public WeakTimerTask(LooperViewPager loopViewPager) {
-            this.mLoopViewPagerWeakReference = new WeakReference<>(loopViewPager);
-        }
-
-        @Override
-        public void run() {
-            LooperViewPager loopViewPager = mLoopViewPagerWeakReference.get();
-            if (loopViewPager != null) {
-                if (loopViewPager.isShown() && System.currentTimeMillis() - loopViewPager.mRecentTouchTime > loopViewPager.delay) {
-                    //要发出消息进行循环
-                    loopViewPager.mHandler.sendEmptyMessage(0);
-                }
-            } else {
-                cancel();
-            }
-        }
-    }
-
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         mRecentTouchTime = System.currentTimeMillis();
         return super.dispatchTouchEvent(ev);
     }
 
-    @Override
-    public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-
-    }
-
-    @Override
-    public void onPageSelected(int position) {
-        mViewDelegate.setCurrentPosition(position, (HintView) mIndicatorView);
-    }
-
-    @Override
-    public void onPageScrollStateChanged(int state) {
-
-    }
-
-
-    public void setHintViewDelegate(ViewDelegate delegate) {
-        this.mViewDelegate = delegate;
-    }
-
-
     /**
-     * 用来实现adapter的notifyDataSetChanged通知position变化
+     * 设置圆点颜色
+     *
+     * @return
      */
-    private class PagerObserver extends DataSetObserver {
-        @Override
-        public void onChanged() {
-            dataSetChanged();
-        }
-
-        @Override
-        public void onInvalidated() {
-            dataSetChanged();
-        }
+    private int setFoucsColor() {
+        return focusColor;
     }
 
+    private int setNormalColor() {
+        return normalColor;
+    }
+
+    public void onStop() {
+        stopPlay();
+    }
+
+    public void onResume() {
+        startPlay();
+    }
+
+    public void setDelay(int delay) {
+        this.delay = delay;
+        startPlay();
+    }
 }
